@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      OSRS_USER_AGENT: >-
+        genai-api-osrs/1.0 (educational project;
+        github.com/rafaeldellag/genai-api-osrs)
+    restart: unless-stopped

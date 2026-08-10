@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Monte seu equipamento e inventário do Old School RuneScape e consulte o valor atualizado na Grand Exchange."
+    />
+    <meta name="theme-color" content="#16130f" />
+    <title>OSRS Loadout Value</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <div class="ambient-glow" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="OSRS Loadout Value — início">
+        <span class="brand-mark" aria-hidden="true">GP</span>
+        <span>
+          <strong>Loadout Value</strong>
+          <small>Old School RuneScape</small>
+        </span>
+      </a>
+
+      <div class="header-status">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span id="market-status">Mercado conectado</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">GRAND EXCHANGE · PREÇOS EM TEMPO REAL</p>
+          <h1 id="page-title">Quanto vale o seu loadout?</h1>
+          <p class="hero-copy">
+            Escolha seus equipamentos, preencha as 28 posições do inventário e
+            veja o valor estimado em moedas na hora.
+          </p>
+        </div>
+
+        <div class="hero-total" aria-live="polite">
+          <span>Patrimônio total</span>
+          <strong id="hero-total">0</strong>
+          <small>moedas</small>
+        </div>
+      </section>
+
+      <div id="app-message" class="app-message" role="status" hidden></div>
+
+      <section class="workspace" aria-label="Montagem do loadout">
+        <article class="panel equipment-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="panel-kicker">11 posições</p>
+              <h2>Equipamento</h2>
+            </div>
+            <span id="equipment-total" class="panel-value">0 gp</span>
+          </div>
+
+          <p class="panel-help">Clique em uma posição para escolher um item.</p>
+          <div
+            id="equipment-grid"
+            class="equipment-grid"
+            aria-label="Posições de equipamento"
+          ></div>
+        </article>
+
+        <article class="panel inventory-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="panel-kicker">4 × 7 · 28 posições</p>
+              <h2>Inventário</h2>
+            </div>
+            <span id="inventory-total" class="panel-value">0 gp</span>
+          </div>
+
+          <p class="panel-help">
+            Itens empilháveis aceitam quantidade. Os preços são recalculados
+            automaticamente.
+          </p>
+          <div
+            id="inventory-grid"
+            class="inventory-grid"
+            aria-label="Inventário com 28 posições"
+          ></div>
+        </article>
+
+        <aside class="summary-panel" aria-labelledby="summary-title">
+          <div>
+            <p class="panel-kicker">RESUMO DO LOADOUT</p>
+            <h2 id="summary-title">Valor estimado</h2>
+          </div>
+
+          <div class="summary-total">
+            <span>Total</span>
+            <strong id="summary-total">0</strong>
+            <small>gp</small>
+          </div>
+
+          <dl class="summary-list">
+            <div>
+              <dt>Equipamento</dt>
+              <dd id="summary-equipment">0 gp</dd>
+            </div>
+            <div>
+              <dt>Inventário</dt>
+              <dd id="summary-inventory">0 gp</dd>
+            </div>
+            <div>
+              <dt>Itens preenchidos</dt>
+              <dd id="summary-count">0 / 39</dd>
+            </div>
+          </dl>
+
+          <div class="summary-actions">
+            <button id="refresh-button" class="button button-primary" type="button">
+              Atualizar preços
+            </button>
+            <button id="clear-button" class="button button-ghost" type="button">
+              Limpar tudo
+            </button>
+          </div>
+
+          <div class="market-note">
+            <span class="market-note-icon" aria-hidden="true">i</span>
+            <p>
+              Estimativa pela média dos últimos preços de compra e venda.
+              <span id="last-update">Aguardando itens.</span>
+            </p>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        Dados de mercado fornecidos pela
+        <a
+          href="https://oldschool.runescape.wiki/w/RuneScape:Real-time_Prices"
+          target="_blank"
+          rel="noreferrer"
+          >OSRS Wiki Real-time Prices</a
+        >.
+      </p>
+      <a href="/docs">Documentação da API</a>
+    </footer>
+
+    <dialog id="item-picker" class="item-picker" aria-labelledby="picker-title">
+      <div class="picker-shell">
+        <header class="picker-header">
+          <div>
+            <p class="panel-kicker">SELECIONAR ITEM</p>
+            <h2 id="picker-title">Escolha um item</h2>
+          </div>
+          <button
+            id="close-picker"
+            class="icon-button"
+            type="button"
+            aria-label="Fechar seletor"
+          >
+            ×
+          </button>
+        </header>
+
+        <label class="search-field" for="item-search">
+          <span aria-hidden="true">⌕</span>
+          <input
+            id="item-search"
+            type="search"
+            placeholder="Busque por nome, ex.: Abyssal whip"
+            autocomplete="off"
+            maxlength="80"
+          />
+          <kbd>ESC</kbd>
+        </label>
+
+        <div class="picker-meta">
+          <span id="search-status">Itens populares</span>
+          <button id="remove-item" class="text-button danger" type="button" hidden>
+            Remover desta posição
+          </button>
+        </div>
+
+        <div id="item-results" class="item-results" aria-live="polite"></div>
+      </div>
+    </dialog>
+  </body>
+</html>
