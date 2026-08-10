@@ -3,6 +3,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 .env
+docs/oracle-cloud.md
 .DS_Store
 .idea/
 .vscode/

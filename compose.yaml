@@ -2,7 +2,10 @@ services:
   app:
     build: .
     ports:
-      - "8000:8000"
+      # A implantação OCI atende pela porta HTTP padrão e mantém a porta 8000
+      # disponível para acesso explícito à API.
+      - "0.0.0.0:80:8000"
+      - "0.0.0.0:8000:8000"
     environment:
       OSRS_USER_AGENT: >-
         genai-api-osrs/1.0 (educational project;

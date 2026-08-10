@@ -11,6 +11,9 @@ class Settings:
     wiki_api_url: str = os.getenv(
         "OSRS_WIKI_API_URL", "https://prices.runescape.wiki/api/v1/osrs"
     )
+    wiki_data_api_url: str = os.getenv(
+        "OSRS_WIKI_DATA_API_URL", "https://oldschool.runescape.wiki/api.php"
+    )
     wiki_user_agent: str = os.getenv(
         "OSRS_USER_AGENT",
         "genai-api-osrs/1.0 (educational project; "
@@ -18,4 +21,7 @@ class Settings:
     )
     request_timeout_seconds: float = float(os.getenv("OSRS_REQUEST_TIMEOUT", "15"))
     mapping_cache_seconds: int = int(os.getenv("OSRS_MAPPING_CACHE_SECONDS", "86400"))
+    equipment_cache_seconds: int = int(
+        os.getenv("OSRS_EQUIPMENT_CACHE_SECONDS", "86400")
+    )
     price_cache_seconds: int = int(os.getenv("OSRS_PRICE_CACHE_SECONDS", "60"))

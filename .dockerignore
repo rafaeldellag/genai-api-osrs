@@ -5,4 +5,5 @@
 __pycache__
 *.py[cod]
 tests
+docs/oracle-cloud.md
 trabalho.pdf

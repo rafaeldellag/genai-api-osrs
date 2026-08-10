@@ -8,6 +8,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.equipment import EQUIPMENT_SLOTS, EquipmentSlot
 from app.osrs_client import OSRSPriceClient, PRICE_METHOD, UpstreamServiceError
 from app.schemas import (
     ItemSearchResponse,
@@ -19,19 +20,6 @@ from app.schemas import (
 
 APP_VERSION = "1.0.0"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-EQUIPMENT_SLOTS = {
-    "head",
-    "cape",
-    "neck",
-    "ammo",
-    "weapon",
-    "body",
-    "shield",
-    "legs",
-    "hands",
-    "feet",
-    "ring",
-}
 INVENTORY_SLOTS = {str(index) for index in range(28)}
 
 
@@ -83,11 +71,17 @@ def create_app(price_service: OSRSPriceClient | None = None) -> FastAPI:
     )
     async def search_items(
         q: str = Query(default="", max_length=80, description="Trecho do nome"),
+        slot: EquipmentSlot | None = Query(
+            default=None, description="Filtra itens equipáveis nesta posição"
+        ),
         limit: int = Query(default=40, ge=1, le=50),
         offset: int = Query(default=0, ge=0),
         service: OSRSPriceClient = Depends(get_price_service),
     ) -> ItemSearchResponse:
-        items, total, as_of = await service.search_items(q, limit, offset)
+        if slot is None:
+            items, total, as_of = await service.search_items(q, limit, offset)
+        else:
+            items, total, as_of = await service.search_items(q, limit, offset, slot)
         return ItemSearchResponse(
             items=items, total=total, limit=limit, offset=offset, as_of=as_of
         )
@@ -154,6 +148,26 @@ def create_app(price_service: OSRSPriceClient | None = None) -> FastAPI:
             raise HTTPException(
                 status_code=404, detail=f"Itens não encontrados: {missing}."
             )
+
+        equipment_entries = [
+            entry for entry in payload.items if entry.area == "equipment"
+        ]
+        if equipment_entries:
+            equipment_ids = {entry.item_id for entry in equipment_entries}
+            slots_by_id = await service.get_equipment_slots_by_ids(equipment_ids)
+            incompatible = [
+                f"{items_by_id[entry.item_id]['name']} em {entry.slot}"
+                for entry in equipment_entries
+                if entry.slot not in slots_by_id.get(entry.item_id, frozenset())
+            ]
+            if incompatible:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        "Itens incompatíveis com as posições: "
+                        f"{', '.join(incompatible)}."
+                    ),
+                )
 
         lines: list[LoadoutValueLine] = []
         equipment_total = 0

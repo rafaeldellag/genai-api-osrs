@@ -1,17 +1,73 @@
 "use strict";
 
+const EQUIPMENT_ICON_ROOT = "/static/equipment-slots";
 const EQUIPMENT_SLOTS = [
-  { id: "head", label: "Cabeça", symbol: "♜" },
-  { id: "cape", label: "Capa", symbol: "◢" },
-  { id: "neck", label: "Pescoço", symbol: "◇" },
-  { id: "ammo", label: "Munição", symbol: "➹" },
-  { id: "weapon", label: "Arma", symbol: "†" },
-  { id: "body", label: "Torso", symbol: "♟" },
-  { id: "shield", label: "Escudo", symbol: "⬙" },
-  { id: "legs", label: "Pernas", symbol: "Ⅱ" },
-  { id: "hands", label: "Mãos", symbol: "♧" },
-  { id: "feet", label: "Pés", symbol: "⌁" },
-  { id: "ring", label: "Anel", symbol: "○" },
+  {
+    id: "head",
+    label: "Cabeça",
+    symbol: "♜",
+    icon: `${EQUIPMENT_ICON_ROOT}/Head_slot.png`,
+  },
+  {
+    id: "cape",
+    label: "Capa",
+    symbol: "◢",
+    icon: `${EQUIPMENT_ICON_ROOT}/Cape_slot.png`,
+  },
+  {
+    id: "neck",
+    label: "Pescoço",
+    symbol: "◇",
+    icon: `${EQUIPMENT_ICON_ROOT}/Neck_slot.png`,
+  },
+  {
+    id: "ammo",
+    label: "Munição",
+    symbol: "➹",
+    icon: `${EQUIPMENT_ICON_ROOT}/Ammo_slot.png`,
+  },
+  {
+    id: "weapon",
+    label: "Arma",
+    symbol: "†",
+    icon: `${EQUIPMENT_ICON_ROOT}/Weapon_slot.png`,
+  },
+  {
+    id: "body",
+    label: "Torso",
+    symbol: "♟",
+    icon: `${EQUIPMENT_ICON_ROOT}/Body_slot.png`,
+  },
+  {
+    id: "shield",
+    label: "Escudo",
+    symbol: "⬙",
+    icon: `${EQUIPMENT_ICON_ROOT}/Shield_slot.png`,
+  },
+  {
+    id: "legs",
+    label: "Pernas",
+    symbol: "Ⅱ",
+    icon: `${EQUIPMENT_ICON_ROOT}/Legs_slot.png`,
+  },
+  {
+    id: "hands",
+    label: "Mãos",
+    symbol: "♧",
+    icon: `${EQUIPMENT_ICON_ROOT}/Hands_slot.png`,
+  },
+  {
+    id: "feet",
+    label: "Pés",
+    symbol: "⌁",
+    icon: `${EQUIPMENT_ICON_ROOT}/Feet_slot.png`,
+  },
+  {
+    id: "ring",
+    label: "Anel",
+    symbol: "○",
+    icon: `${EQUIPMENT_ICON_ROOT}/Ring_slot.png`,
+  },
 ];
 
 const STORAGE_KEY = "osrs-loadout-value:v1";
@@ -23,7 +79,6 @@ const elements = {
   inventoryGrid: document.querySelector("#inventory-grid"),
   equipmentTotal: document.querySelector("#equipment-total"),
   inventoryTotal: document.querySelector("#inventory-total"),
-  heroTotal: document.querySelector("#hero-total"),
   summaryTotal: document.querySelector("#summary-total"),
   summaryEquipment: document.querySelector("#summary-equipment"),
   summaryInventory: document.querySelector("#summary-inventory"),
@@ -177,6 +232,30 @@ function makeItemImage(item, className) {
   return image;
 }
 
+function makeSlotPlaceholder(definition) {
+  if (!definition.icon) {
+    return createElement("span", "slot-placeholder", definition.symbol ?? "?");
+  }
+
+  const image = createElement("img", "slot-placeholder-icon");
+  image.src = definition.icon;
+  image.alt = "";
+  image.width = 36;
+  image.height = 36;
+  image.decoding = "async";
+  image.setAttribute("aria-hidden", "true");
+  image.addEventListener(
+    "error",
+    () => {
+      image.replaceWith(
+        createElement("span", "slot-placeholder", definition.symbol ?? "?"),
+      );
+    },
+    { once: true },
+  );
+  return image;
+}
+
 function buildSlot(target, definition, item) {
   const wrapper = createElement(
     "div",
@@ -233,7 +312,7 @@ function buildSlot(target, definition, item) {
       "aria-label",
       `${definition.label}: posição vazia. Clique para escolher um item.`,
     );
-    button.append(createElement("span", "slot-placeholder", definition.symbol));
+    button.append(makeSlotPlaceholder(definition));
     button.append(createElement("span", "slot-label", definition.label));
     if (target.area === "inventory") {
       button.append(createElement("span", "inventory-index", definition.index));
@@ -288,7 +367,6 @@ function applyTotals(equipmentTotal, inventoryTotal) {
   const count = allSelections().length;
   elements.equipmentTotal.textContent = `${formatCompact(equipmentTotal)} gp`;
   elements.inventoryTotal.textContent = `${formatCompact(inventoryTotal)} gp`;
-  elements.heroTotal.textContent = formatCoins(total);
   elements.summaryTotal.textContent = formatCoins(total);
   elements.summaryEquipment.textContent = `${formatCoins(equipmentTotal)} gp`;
   elements.summaryInventory.textContent = `${formatCoins(inventoryTotal)} gp`;
@@ -365,6 +443,9 @@ async function searchItems(query) {
 
   try {
     const params = new URLSearchParams({ q: query.trim(), limit: "40" });
+    if (pickerTarget?.area === "equipment") {
+      params.set("slot", pickerTarget.slot);
+    }
     const data = await fetchJson(`/api/items?${params}`, {
       signal: searchController.signal,
     });

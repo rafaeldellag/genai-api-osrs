@@ -9,6 +9,7 @@ from urllib.parse import quote
 import httpx
 
 from app.config import Settings
+from app.equipment import EQUIPMENT_SLOTS, EquipmentSlot, normalize_wiki_slot
 
 
 PRICE_METHOD = (
@@ -30,6 +31,8 @@ FEATURED_ITEM_IDS = (
     6737,   # Berserker ring
     12002,  # Occult necklace
 )
+
+EQUIPMENT_PAGE_SIZE = 5_000
 
 
 class UpstreamServiceError(RuntimeError):
@@ -73,7 +76,8 @@ class OSRSPriceClient:
         if cached and cached.expires_at > now:
             return cached.value
 
-        async with self._locks[key]:
+        lock = self._locks.setdefault(key, asyncio.Lock())
+        async with lock:
             now = time.monotonic()
             cached = self._cache.get(key)
             if cached and cached.expires_at > now:
@@ -94,6 +98,82 @@ class OSRSPriceClient:
 
             self._cache[key] = CacheEntry(value=payload, expires_at=now + ttl)
             return payload
+
+    def _equipment_api_url(self, offset: int) -> str:
+        query = (
+            'bucket("infobox_bonuses")'
+            '.select("equipment_slot", "infobox_item.item_id")'
+            '.join("infobox_item", "infobox_item.page_name_sub", '
+            '"infobox_bonuses.page_name_sub")'
+            '.where("infobox_item.tradeable", true)'
+            f".limit({EQUIPMENT_PAGE_SIZE}).offset({offset}).run()"
+        )
+        return str(
+            httpx.URL(
+                self.settings.wiki_data_api_url,
+                params={
+                    "action": "bucket",
+                    "format": "json",
+                    "formatversion": "2",
+                    "query": query,
+                },
+            )
+        )
+
+    async def _equipment_slot_data(self) -> dict[int, frozenset[str]]:
+        slots_by_id: dict[int, set[str]] = {}
+        offset = 0
+
+        while True:
+            payload = await self._cached_request(
+                f"equipment:{offset}",
+                self._equipment_api_url(offset),
+                self.settings.equipment_cache_seconds,
+            )
+            rows = payload.get("bucket") if isinstance(payload, dict) else None
+            if not isinstance(rows, list):
+                raise UpstreamServiceError(
+                    "A OSRS Wiki retornou dados de equipamento inválidos."
+                )
+
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                raw_slot = row.get("equipment_slot")
+                raw_ids = row.get("infobox_item.item_id")
+                if not isinstance(raw_slot, str) or not isinstance(raw_ids, list):
+                    continue
+
+                slot = normalize_wiki_slot(raw_slot)
+                if slot not in EQUIPMENT_SLOTS:
+                    continue
+
+                for raw_id in raw_ids:
+                    try:
+                        item_id = int(raw_id)
+                    except (TypeError, ValueError):
+                        continue
+                    slots_by_id.setdefault(item_id, set()).add(slot)
+
+            if len(rows) < EQUIPMENT_PAGE_SIZE:
+                break
+            offset += EQUIPMENT_PAGE_SIZE
+
+        return {
+            item_id: frozenset(slots) for item_id, slots in slots_by_id.items()
+        }
+
+    async def get_equipment_slots_by_ids(
+        self, item_ids: set[int]
+    ) -> dict[int, frozenset[str]]:
+        if not item_ids:
+            return {}
+        slots_by_id = await self._equipment_slot_data()
+        return {
+            item_id: slots_by_id[item_id]
+            for item_id in item_ids
+            if item_id in slots_by_id
+        }
 
     async def _catalog_data(self) -> tuple[list[dict[str, Any]], dict[str, Any], int | None]:
         mapping_payload, latest_payload = await asyncio.gather(
@@ -160,9 +240,20 @@ class OSRSPriceClient:
         }
 
     async def search_items(
-        self, query: str, limit: int, offset: int
+        self,
+        query: str,
+        limit: int,
+        offset: int,
+        equipment_slot: EquipmentSlot | None = None,
     ) -> tuple[list[dict[str, Any]], int, int | None]:
-        mapping, latest, as_of = await self._catalog_data()
+        if equipment_slot is None:
+            mapping, latest, as_of = await self._catalog_data()
+            slots_by_id: dict[int, frozenset[str]] = {}
+        else:
+            catalog, slots_by_id = await asyncio.gather(
+                self._catalog_data(), self._equipment_slot_data()
+            )
+            mapping, latest, as_of = catalog
         normalized_query = query.strip().casefold()
 
         candidates = [
@@ -172,6 +263,10 @@ class OSRSPriceClient:
             and isinstance(item.get("id"), int)
             and isinstance(item.get("name"), str)
             and (not normalized_query or normalized_query in item["name"].casefold())
+            and (
+                equipment_slot is None
+                or equipment_slot in slots_by_id.get(item["id"], frozenset())
+            )
         ]
 
         if normalized_query:
