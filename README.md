@@ -40,8 +40,6 @@ Os dados vêm da
 [API de preços da OSRS Wiki](https://oldschool.runescape.wiki/w/RuneScape:Real-time_Prices)
 e das
 [tabelas de equipamentos](https://oldschool.runescape.wiki/w/Category:Slot_tables).
-Os ícones seguem o modelo de
-[Worn Equipment](https://oldschool.runescape.wiki/w/Worn_Equipment).
 
 ## Desenvolvimento
 
