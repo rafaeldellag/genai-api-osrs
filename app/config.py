@@ -8,6 +8,13 @@ from dataclasses import dataclass
 class Settings:
     """Runtime configuration read from environment variables."""
 
+    allowed_hosts: tuple[str, ...] = tuple(
+        host.strip()
+        for host in os.getenv(
+            "OSRS_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver"
+        ).split(",")
+        if host.strip()
+    )
     wiki_api_url: str = os.getenv(
         "OSRS_WIKI_API_URL", "https://prices.runescape.wiki/api/v1/osrs"
     )

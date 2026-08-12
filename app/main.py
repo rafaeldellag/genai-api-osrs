@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.responses import Response
 
+from app.config import Settings
 from app.equipment import EQUIPMENT_SLOTS, EquipmentSlot
-from app.osrs_client import OSRSPriceClient, PRICE_METHOD, UpstreamServiceError
+from app.osrs_client import PRICE_METHOD, OSRSPriceClient, UpstreamServiceError
 from app.schemas import (
     ItemSearchResponse,
     ItemView,
@@ -21,9 +24,28 @@ from app.schemas import (
 APP_VERSION = "1.0.0"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 INVENTORY_SLOTS = {str(index) for index in range(28)}
+SECURITY_HEADERS = {
+    "Permissions-Policy": "camera=(), geolocation=(), microphone=()",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+}
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; "
+    "base-uri 'none'; "
+    "connect-src 'self'; "
+    "form-action 'self'; "
+    "frame-ancestors 'none'; "
+    "img-src 'self' https://oldschool.runescape.wiki; "
+    "object-src 'none'; "
+    "script-src 'self'; "
+    "style-src 'self'"
+)
 
 
 def create_app(price_service: OSRSPriceClient | None = None) -> FastAPI:
+    settings = Settings()
+
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         owns_service = application.state.price_service is None
@@ -43,6 +65,23 @@ def create_app(price_service: OSRSPriceClient | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     application.state.price_service = price_service
+    application.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=list(settings.allowed_hosts),
+        www_redirect=False,
+    )
+
+    @application.middleware("http")
+    async def add_security_headers(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        response = await call_next(request)
+        for header, value in SECURITY_HEADERS.items():
+            response.headers[header] = value
+        if request.url.path == "/":
+            response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+        return response
 
     def get_price_service(request: Request) -> OSRSPriceClient:
         service = request.app.state.price_service
