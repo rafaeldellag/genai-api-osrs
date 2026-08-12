@@ -109,6 +109,16 @@ def test_health_and_frontend_are_served() -> None:
     assert health.json() == {"status": "ok", "version": "1.0.0"}
     assert page.status_code == 200
     assert "Quanto vale o seu loadout?" in page.text
+    assert page.headers["content-security-policy"].startswith("default-src 'self'")
+    assert page.headers["x-content-type-options"] == "nosniff"
+    assert page.headers["x-frame-options"] == "DENY"
+
+
+def test_untrusted_host_is_rejected() -> None:
+    with make_client() as client:
+        response = client.get("/api/health", headers={"host": "attacker.invalid"})
+
+    assert response.status_code == 400
 
 
 def test_equipment_slot_icons_are_served_and_referenced() -> None:
